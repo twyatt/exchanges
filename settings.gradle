@@ -1,0 +1,3 @@
+include ':common'
+include ':cli'
+include ':app'

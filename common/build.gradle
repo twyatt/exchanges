@@ -1,0 +1,22 @@
+apply plugin: 'kotlin'
+apply plugin: 'idea'
+
+kotlin.experimental.coroutines 'enable'
+
+test.testLogging.events 'skipped', 'passed', 'failed'
+
+ext {
+    xchangeVersion = '4.3.2'
+}
+
+dependencies {
+    compile "org.jetbrains.kotlin:kotlin-stdlib:${rootProject.kotlinVersion}"
+    compile "org.jetbrains.kotlinx:kotlinx-coroutines-core:0.21"
+
+    compile "org.knowm.xchange:xchange-core:$xchangeVersion"
+    compile "org.knowm.xchange:xchange-binance:$xchangeVersion"
+    compile "org.knowm.xchange:xchange-poloniex:$xchangeVersion"
+    compile "org.knowm.xchange:xchange-gemini:$xchangeVersion"
+
+    testCompile "junit:junit:${rootProject.junitVersion}"
+}
