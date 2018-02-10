@@ -1,39 +1,88 @@
+import com.google.gson.Gson
+import com.google.gson.GsonBuilder
+import com.google.gson.reflect.TypeToken
+import com.traviswyatt.exchanges.fetchTradeHistory
 import com.traviswyatt.exchanges.isNonZero
 import com.traviswyatt.exchanges.name
 import com.traviswyatt.exchanges.specifications
-import kotlinx.coroutines.experimental.async
 import kotlinx.coroutines.experimental.runBlocking
+import org.knowm.xchange.Exchange
 import org.knowm.xchange.ExchangeFactory
+import org.knowm.xchange.currency.CurrencyPair
 import org.knowm.xchange.dto.account.AccountInfo
+import org.knowm.xchange.dto.trade.UserTrades
+import java.io.File
 
-//    BinanceService().pairs.forEach { println(it) }
+private val gson = GsonBuilder().setPrettyPrinting().create()
 
-fun main(args: Array<String>) = runBlocking {
-    specifications
-        // List<ExchangeSpecification> → List<Exchange>
-        .map { ExchangeFactory.INSTANCE.createExchange(it) }
+private fun log(message: String) = println("[${Thread.currentThread().name}] $message")
 
-        // List<Exchange> → List<Pair<Exchange, Deferred<AccountInfo>>>
-        // asynchronously fetches account info associated with all exchanges
-        .map { Pair(it, async { it.accountService.accountInfo }) }
+fun main(args: Array<String>) {
+    val exchanges = specifications.map { ExchangeFactory.INSTANCE.createExchange(it) }
 
-        // List<Pair<Exchange, Deferred<AccountInfo>>> → List<Pair<Exchange, AccountInfo>>
-        // joins the asynchronous jobs back together
-        .map { (exchange, deferred) -> Pair(exchange, deferred.await()) }
+    val onlyGemini = exchanges.first { it.name == "Gemini" }
+//    saveTradeHistories(onlyGemini)
+    val histories = mapOf(onlyGemini.name to onlyGemini.loadTradeHistory())
 
-        .forEach { (exchange, accountInfo) ->
-            println("=== ${exchange.name} ===\n")
-            printWallets(accountInfo)
-            print("\n\n\n")
+    printTradeHistories(histories)
+}
+
+fun printTradeHistories(histories: Map<String, Map<CurrencyPair, UserTrades>>) {
+    histories.forEach { (name, tradeHistory) ->
+        log("=== $name ===")
+        tradeHistory.forEach { pair, trades ->
+            log("  \$\$\$ $pair \$\$\$")
+            trades.trades.forEach { trade ->
+                log("    $trade")
+            }
         }
+    }
+}
+
+fun fetchTradeHistories(exchanges: List<Exchange>): Map<String, Map<CurrencyPair, UserTrades>> {
+    val jobs = exchanges.map { exchange ->
+        log("Queueing ${exchange.name}")
+        Pair(exchange.name, exchange.fetchTradeHistory())
+    }
+
+    return runBlocking {
+        jobs.map { (name, deferred) ->
+            log("Processing $name")
+            val tradeHistory = deferred.await()
+            val result = Pair(name, tradeHistory)
+            log("Finished $name")
+            result
+        }
+    }.toMap()
+}
+
+fun saveTradeHistories(tradeHistories: Map<CurrencyPair, UserTrades>) {
+    tradeHistories.forEach { (name, history) ->
+        val json = gson.toJson(history)
+        val filename = "$name.json"
+        log("Saving to $filename")
+        File(filename).writeText(json)
+    }
 }
 
 private fun printWallets(accountInfo: AccountInfo) {
     accountInfo.wallets
         .forEach { id, wallet ->
-            println("Wallet [id=$id]")
+            log("Wallet [id=$id]")
             wallet.balances
                 .filter { (_, balance) -> balance.available.isNonZero }
-                .forEach { currency, balance -> println("  $currency: $balance") }
+                .forEach { currency, balance -> log("  $currency: $balance") }
         }
 }
+
+fun Exchange.loadTradeHistory(): Map<CurrencyPair, UserTrades> {
+    val file = File("$name.json")
+    val json = file.readText()
+    return Gson()
+        .fromJson<Map<String, UserTrades>>(json)
+        .map { (pair, trades) -> Pair(CurrencyPair(pair), trades) }
+        .toMap()
+}
+
+inline fun <reified T> Gson.fromJson(json: String): T =
+    this.fromJson<T>(json, object : TypeToken<T>() {}.type)
