@@ -27,12 +27,14 @@ fun Exchange.fetchTradeHistory() = async {
 
 private suspend fun fetchTradeHistory(
     exchange: Exchange,
-    params: TradeHistoryParamCurrencyPair
+    params: TradeHistoryParamCurrencyPair,
+    throttleMs: Long = 5_000L
 ): Map<CurrencyPair, UserTrades> {
-    return exchange.pairs.map { pair ->
-        println("Fetching ${exchange.name} → $pair")
-        params.currencyPair = pair
-        delay(5_000L)
-        pair to exchange.tradeService.getTradeHistory(params)
-    }.toMap()
+    return exchange.pairs
+        .map { pair ->
+            println("Fetching ${exchange.name} → $pair")
+            params.currencyPair = pair
+            delay(throttleMs)
+            pair to exchange.tradeService.getTradeHistory(params)
+        }.toMap()
 }

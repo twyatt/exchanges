@@ -13,9 +13,9 @@ import org.knowm.xchange.dto.account.AccountInfo
 import org.knowm.xchange.dto.trade.UserTrades
 import java.io.File
 
-private val gson = GsonBuilder().setPrettyPrinting().create()
-
 private fun log(message: String) = println("[${Thread.currentThread().name}] $message")
+
+private val gson = GsonBuilder().setPrettyPrinting().create()
 
 fun main(args: Array<String>) {
     val exchanges = specifications.map { ExchangeFactory.INSTANCE.createExchange(it) }
@@ -76,12 +76,15 @@ private fun printWallets(accountInfo: AccountInfo) {
 }
 
 fun Exchange.loadTradeHistory(): Map<CurrencyPair, UserTrades> {
-    val file = File("$name.json")
-    val json = file.readText()
+    val json = File("$name.json").readText()
     return Gson()
         .fromJson<Map<String, UserTrades>>(json)
-        .map { (pair, trades) -> Pair(CurrencyPair(pair), trades) }
-        .toMap()
+
+        // Map<String, UserTrades> → List<Pair<String, UserTrades>>
+        .toList()
+
+        // List<Pair<String, UserTrades>> → Map<CurrencyPair, UserTrades>
+        .associate { (pair, trades) -> Pair(CurrencyPair(pair), trades) }
 }
 
 inline fun <reified T> Gson.fromJson(json: String): T =
