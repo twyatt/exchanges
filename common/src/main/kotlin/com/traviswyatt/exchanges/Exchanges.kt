@@ -2,6 +2,9 @@ package com.traviswyatt.exchanges
 
 import org.knowm.xchange.Exchange
 
+val Exchange.name
+    get() = exchangeSpecification.exchangeName
+
 val Exchange.pairs
     get() = exchangeSymbols
 
