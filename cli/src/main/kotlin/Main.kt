@@ -17,33 +17,52 @@ private fun log(message: String) = println("[${Thread.currentThread().name}] $me
 
 private val gson = GsonBuilder().setPrettyPrinting().create()
 
+typealias ExchangeName = String
+
 fun main(args: Array<String>) {
-    val exchanges = specifications.map { ExchangeFactory.INSTANCE.createExchange(it) }
+    specifications
 
-    val onlyGemini = exchanges.first { it.name == "Gemini" }
-//    saveTradeHistories(onlyGemini)
-    val histories = mapOf(onlyGemini.name to onlyGemini.loadTradeHistory())
+        // List<ExchangeSpecification> → List<Exchange>
+        .map { ExchangeFactory.INSTANCE.createExchange(it) }
 
-    printTradeHistories(histories)
+        .filter { it.name == "Gemini" }
+
+        // List<Exchange> → Map<ExchangeName, Map<CurrencyPair, UserTrades>>
+        .let(::fetchTradeHistories).also(::saveTradeHistories)
+//        .let(::loadTradeHistories)
+
+        .also(::printTradeHistories)
 }
 
-fun printTradeHistories(histories: Map<String, Map<CurrencyPair, UserTrades>>) {
-    histories.forEach { (name, tradeHistory) ->
-        log("=== $name ===")
-        tradeHistory.forEach { pair, trades ->
-            log("  \$\$\$ $pair \$\$\$")
-            trades.trades.forEach { trade ->
-                log("    $trade")
+fun saveTradeHistories(tradeHistories: Map<ExchangeName, Map<CurrencyPair, UserTrades>>) {
+    tradeHistories
+        .forEach { exchangeName, tradeHistory ->
+            val json = gson.toJson(tradeHistory)
+            val filename = "$exchangeName.json"
+            log("Saving to $filename")
+            File(filename).writeText(json)
+        }
+}
+
+fun printTradeHistories(histories: Map<ExchangeName, Map<CurrencyPair, UserTrades>>) {
+    histories
+        .forEach { (name, tradeHistory) ->
+            log("=== $name ===")
+            tradeHistory.forEach { pair, trades ->
+                log("  \$\$\$ $pair \$\$\$")
+                trades.trades.forEach { trade ->
+                    log("    $trade")
+                }
             }
         }
-    }
 }
 
 fun fetchTradeHistories(exchanges: List<Exchange>): Map<String, Map<CurrencyPair, UserTrades>> {
-    val jobs = exchanges.map { exchange ->
-        log("Queueing ${exchange.name}")
-        Pair(exchange.name, exchange.fetchTradeHistory())
-    }
+    val jobs = exchanges
+        .map { exchange ->
+            log("Queueing ${exchange.name}")
+            Pair(exchange.name, exchange.fetchTradeHistory())
+        }
 
     return runBlocking {
         jobs.map { (name, deferred) ->
@@ -56,15 +75,6 @@ fun fetchTradeHistories(exchanges: List<Exchange>): Map<String, Map<CurrencyPair
     }.toMap()
 }
 
-fun saveTradeHistories(tradeHistories: Map<CurrencyPair, UserTrades>) {
-    tradeHistories.forEach { (name, history) ->
-        val json = gson.toJson(history)
-        val filename = "$name.json"
-        log("Saving to $filename")
-        File(filename).writeText(json)
-    }
-}
-
 private fun printWallets(accountInfo: AccountInfo) {
     accountInfo.wallets
         .forEach { id, wallet ->
@@ -75,16 +85,25 @@ private fun printWallets(accountInfo: AccountInfo) {
         }
 }
 
-fun Exchange.loadTradeHistory(): Map<CurrencyPair, UserTrades> {
-    val json = File("$name.json").readText()
-    return Gson()
-        .fromJson<Map<String, UserTrades>>(json)
+fun loadTradeHistories(exchanges: List<Exchange>): Map<ExchangeName, Map<CurrencyPair, UserTrades>> {
+    return exchanges
+        // List<Exchange> → List<Pair<ExchangeName, Map<CurrencyPair, UserTrades>>>
+        .map { exchange -> exchange.name to loadTradeHistory(exchange) }
 
-        // Map<String, UserTrades> → List<Pair<String, UserTrades>>
-        .toList()
+        // List<Pair<ExchangeName, Map<CurrencyPair, UserTrades>>> → Map<ExchangeName, Map<CurrencyPair, UserTrades>>
+        .toMap()
+}
 
-        // List<Pair<String, UserTrades>> → Map<CurrencyPair, UserTrades>
-        .associate { (pair, trades) -> Pair(CurrencyPair(pair), trades) }
+private fun loadTradeHistory(exchange: Exchange): Map<CurrencyPair, UserTrades> {
+    return gson
+        // Map<String, UserTrades>
+        .fromJson<Map<String, UserTrades>>(File("${exchange.name}.json").readText())
+
+        // Map<String, UserTrades> → List<Pair<CurrencyPair, UserTrades>>
+        .map { (pair, trades) -> Pair(CurrencyPair(pair), trades) }
+
+        // List<Pair<CurrencyPair, UserTrades>> → Map<CurrencyPair, UserTrades>
+        .toMap()
 }
 
 inline fun <reified T> Gson.fromJson(json: String): T =
