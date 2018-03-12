@@ -10,7 +10,6 @@ dependencies {
     compile project(':common')
     compile "org.jetbrains.kotlin:kotlin-stdlib:${rootProject.kotlinVersion}"
     compile "org.slf4j:slf4j-simple:1.7.25"
-    compile 'com.google.code.gson:gson:2.8.2'
 
     testCompile "junit:junit:${rootProject.junitVersion}"
 }

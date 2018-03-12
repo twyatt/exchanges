@@ -6,7 +6,7 @@ kotlin.experimental.coroutines 'enable'
 test.testLogging.events 'skipped', 'passed', 'failed'
 
 ext {
-    xchangeVersion = '4.3.2'
+    xchangeVersion = '4.3.4'
 }
 
 dependencies {
@@ -17,6 +17,8 @@ dependencies {
     compile "org.knowm.xchange:xchange-binance:$xchangeVersion"
     compile "org.knowm.xchange:xchange-poloniex:$xchangeVersion"
     compile "org.knowm.xchange:xchange-gemini:$xchangeVersion"
+
+    compile 'com.google.code.gson:gson:2.8.2'
 
     testCompile "junit:junit:${rootProject.junitVersion}"
 }
