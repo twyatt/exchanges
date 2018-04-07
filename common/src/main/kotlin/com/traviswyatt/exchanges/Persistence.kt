@@ -1,17 +1,21 @@
 package com.traviswyatt.exchanges
 
-import com.google.gson.Gson
-import com.google.gson.GsonBuilder
+import com.google.gson.*
 import com.google.gson.reflect.TypeToken
 import org.knowm.xchange.Exchange
 import org.knowm.xchange.dto.account.FundingRecord
 import org.knowm.xchange.dto.trade.UserTrade
 import java.io.File
+import java.util.*
 
 const val FUNDING_HISTORY_POSTFIX = "_funding_history.json"
 const val TRADE_HISTORY_POSTFIX = "_trade_history.json"
 
-private val defaultGson = GsonBuilder().setPrettyPrinting().create()
+private val defaultGson: Gson = GsonBuilder()
+    .registerTypeAdapter(Date::class.java, JsonDeserializer<Date> { json, _, _ -> Date(json.asJsonPrimitive.asLong) } )
+    .registerTypeAdapter(Date::class.java, JsonSerializer<Date> { date, _, _ -> JsonPrimitive(date.time) } )
+    .setPrettyPrinting()
+    .create()
 
 private inline fun <reified T> Gson.fromJson(json: String): T =
     this.fromJson<T>(json, object : TypeToken<T>() {}.type)

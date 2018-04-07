@@ -1,4 +1,4 @@
-package com.traviswyatt.exchanges
+package com.traviswyatt.exchanges.csv
 
 import org.knowm.xchange.currency.Currency
 import org.knowm.xchange.dto.account.FundingRecord
@@ -9,7 +9,12 @@ import java.util.*
 
 data class GeminiCsv(val header: List<String>, val rows: List<List<String>>)
 
-fun File.asGeminiCsv(): GeminiCsv = readCsv().let { GeminiCsv(it.first(), it.drop(1)) }
+fun File.asGeminiCsv(): GeminiCsv = readCsv().let {
+    GeminiCsv(
+        it.first(),
+        it.drop(1)
+    )
+}
 
 fun GeminiCsv.toFundingHistory(): List<FundingRecord> {
     return rows
@@ -25,6 +30,42 @@ fun GeminiCsv.toFundingHistory(): List<FundingRecord> {
 
 private fun rowToFundingRecord(row: Map<String, String>): FundingRecord {
     /*
+    Date,
+    Time (UTC),
+    Type,
+    Symbol,
+    Specification,
+    Liquidity Indicator,
+    Trading Fee Rate (bps),
+    USD Amount USD,
+    Trading Fee (USD) USD,
+    USD Balance USD,
+    BTC Amount BTC,
+    Trading Fee (BTC) BTC,
+    BTC Balance BTC,
+    ETH Amount ETH,
+    Trading Fee (ETH) ETH,
+    ETH Balance ETH,
+    ZEC Amount ZEC,
+    ZEC Balance ZEC,
+    BCH Amount BCH,
+    Trading Fee (BCH) BCH,
+    BCH Balance BCH,
+    LTC Amount LTC,
+    Trading Fee (LTC) LTC,
+    LTC Balance LTC,
+    Trade ID,
+    Order ID,
+    Order Date,
+    Order Time,
+    Client Order ID,
+    API Session,
+    Tx Hash,
+    Deposit Tx Output,
+    Withdrawal Destination,
+    Withdrawal Tx Output
+
+
     CSV Column Headers:
     Date,
     Time (UTC),
@@ -52,6 +93,8 @@ private fun rowToFundingRecord(row: Map<String, String>): FundingRecord {
     Withdrawal Destination
     */
 
+    println("row=$row")
+
     val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS z", Locale.ENGLISH)
 
     // e.g. "(0.123 BTC)" → BigDecimal("-0.123")
@@ -65,7 +108,11 @@ private fun rowToFundingRecord(row: Map<String, String>): FundingRecord {
     fun String.cryptoBalanceAsBigDecimal() = BigDecimal(trim().substringBefore(' ').trim())
 
     // e.g. "$123.00 " → BigDecimal("123.00")
-    fun String.usdAmountAsBigDecimal() = BigDecimal(trimStart('$').trim())
+    fun String.usdAmountAsBigDecimal() = try {
+        BigDecimal(trimStart('$').trim())
+    } catch (e: Exception) {
+        throw IllegalArgumentException("Unable to parse '$this'", e)
+    }
 
     // e.g. ""$1,234.56 "" → BigDecimal("1234.56")
     // e.g. ""($1,234.56) "" → BigDecimal("-1234.56")
@@ -79,18 +126,18 @@ private fun rowToFundingRecord(row: Map<String, String>): FundingRecord {
     val currency = Currency.getInstance(row["Symbol"]?.substring(0..2))
     val (amount, balance) = when (currency) {
         Currency.BTC -> {
-            val amount = row["BTC Amount"]?.cryptoAmountAsBigDecimal()
-            val balance = row["BTC Balance"]?.cryptoBalanceAsBigDecimal()
+            val amount = row["BTC Amount BTC"]?.cryptoAmountAsBigDecimal()
+            val balance = row["BTC Balance BTC"]?.cryptoBalanceAsBigDecimal()
             amount to balance
         }
         Currency.ETH -> {
-            val amount = row["ETH Amount"]?.cryptoAmountAsBigDecimal()
-            val balance = row["ETH Balance"]?.cryptoBalanceAsBigDecimal()
+            val amount = row["ETH Amount ETH"]?.cryptoAmountAsBigDecimal()
+            val balance = row["ETH Balance ETH"]?.cryptoBalanceAsBigDecimal()
             amount to balance
         }
         Currency.USD -> {
-            val amount = row["USD Amount"]?.usdAmountAsBigDecimal()
-            val balance = row["USD Balance"]?.usdBalanceAsBigDecimal()
+            val amount = row["USD Amount USD"]?.usdAmountAsBigDecimal()
+            val balance = row["USD Balance USD"]?.usdBalanceAsBigDecimal()
             amount to balance
         }
         else -> error("Unknown currency: $currency")
@@ -103,7 +150,13 @@ private fun rowToFundingRecord(row: Map<String, String>): FundingRecord {
         else -> error("Unknown type: ${row["Type"]}")
     }
     val status = FundingRecord.Status.COMPLETE
-    val fee = BigDecimal.ZERO
+    val fee = row["Trading Fee (USD) USD"].let {
+        if (it.isNullOrEmpty()) {
+            BigDecimal.ZERO
+        } else {
+            it!!.usdAmountAsBigDecimal()
+        }
+    }
     val description = row["Specification"]
 
     return FundingRecord(

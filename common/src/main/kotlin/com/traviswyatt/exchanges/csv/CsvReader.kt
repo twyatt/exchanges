@@ -1,4 +1,4 @@
-package com.traviswyatt.exchanges
+package com.traviswyatt.exchanges.csv
 
 import java.io.File
 import java.nio.charset.Charset
@@ -26,5 +26,6 @@ private fun parseLine(line: String, separator: Char): List<String> {
             else -> builder.append(ch)
         }
     }
+    result.add(builder.toString())
     return result
 }

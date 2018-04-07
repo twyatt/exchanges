@@ -1,4 +1,4 @@
-import com.traviswyatt.exchanges.GeminiCsv
+import com.traviswyatt.exchanges.csv.GeminiCsv
 import com.traviswyatt.exchanges.isNonZero
 import com.traviswyatt.exchanges.name
 import org.knowm.xchange.Exchange
